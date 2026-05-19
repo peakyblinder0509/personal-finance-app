@@ -1,0 +1,71 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.financetracker'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Lombok's annotation processor must run at compile time so the @-annotations
+// can generate code before javac tries to compile the class.
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // ── Spring Boot Starters ──────────────────────────────────────────────────
+    // Each "starter" is a curated bundle of libraries + auto-configuration.
+    // You declare one dependency and Spring Boot wires everything together.
+
+    // Brings in Spring MVC, an embedded Tomcat server, and Jackson (JSON).
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Brings in Hibernate (JPA), HikariCP (connection pool), and Spring Data.
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // Brings in Spring Security for authentication and authorization.
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Brings in Hibernate Validator for @NotNull, @Size, @Email, etc.
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // ── Database ──────────────────────────────────────────────────────────────
+    // JDBC driver so the app can actually talk to PostgreSQL.
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Flyway manages database schema changes through versioned SQL scripts.
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+
+    // ── Lombok ────────────────────────────────────────────────────────────────
+    // Generates boilerplate (getters, setters, constructors) at compile time.
+    // compileOnly = not needed at runtime; annotationProcessor = runs javac plugin.
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // ── Dev Tools ─────────────────────────────────────────────────────────────
+    // Enables live reload and faster restarts during development.
+    // developmentOnly = excluded from the final production JAR automatically.
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // ── Testing ───────────────────────────────────────────────────────────────
+    // Includes JUnit 5, Mockito, AssertJ, and MockMvc — everything you need.
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
