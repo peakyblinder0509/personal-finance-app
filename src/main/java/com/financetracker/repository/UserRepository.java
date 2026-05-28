@@ -16,4 +16,4 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Generates: SELECT COUNT(*) > 0 FROM users WHERE email = ?
     // More efficient than findByEmail when you only need a yes/no answer.
     boolean existsByEmail(String email);
-}
+}   
