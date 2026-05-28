@@ -3,6 +3,8 @@ package com.financetracker.service;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
@@ -13,22 +15,25 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
+
     @Value("${app.jwt.secret}")
     private String secret;
 
     @Value("${app.jwt.expiration-ms}")
     private long expirationMs;
 
-    // Email is embedded as a custom claim so the filter can populate it in the
-    // SecurityContext without a DB round-trip on every request.
     public String generateToken(UUID userId, String email) {
-        return Jwts.builder()
-                .subject(userId.toString())          // "sub" claim — the user's UUID
-                .claim("email", email)               // custom claim — carried inside the payload
+        String token = Jwts.builder()
+                .subject(userId.toString())
+                .claim("email", email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
-                .signWith(signingKey())               // HMAC-SHA256 signature
+                .signWith(signingKey())
                 .compact();
+
+        log.debug("JWT generated for userId={}, email={}", userId, email);
+        return token;
     }
 
     public UUID extractUserId(String token) {
@@ -44,6 +49,7 @@ public class JwtService {
             Jwts.parser().verifyWith(signingKey()).build().parseSignedClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT: {}", e.getMessage());
             return false;
         }
     }

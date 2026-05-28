@@ -5,6 +5,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -13,9 +15,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
-// OncePerRequestFilter guarantees this runs exactly once per HTTP request.
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final JwtService jwtService;
 
@@ -29,7 +32,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader("Authorization");
 
-        // No token → pass through. SecurityConfig will reject unauthorized routes.
         if (header == null || !header.startsWith("Bearer ")) {
             chain.doFilter(request, response);
             return;
@@ -38,10 +40,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = header.substring(7);
         if (jwtService.validateToken(token)) {
             UUID userId = jwtService.extractUserId(token);
-            // Store userId as the principal name — controllers retrieve it via Principal.getName()
-            var auth = new UsernamePasswordAuthenticationToken(
-                    userId.toString(), null, List.of());
+            var auth = new UsernamePasswordAuthenticationToken(userId.toString(), null, List.of());
             SecurityContextHolder.getContext().setAuthentication(auth);
+            log.debug("Authenticated request: userId={}, path={}", userId, request.getRequestURI());
+        } else {
+            log.warn("Rejected request with invalid token: path={}", request.getRequestURI());
         }
 
         chain.doFilter(request, response);
