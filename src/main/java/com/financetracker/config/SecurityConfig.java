@@ -30,6 +30,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()  // register + login are public
+                .requestMatchers("/api/health").permitAll()   // health check must work without a token
                 .anyRequest().authenticated()                  // everything else needs a valid JWT
             )
             // Run our JWT filter before Spring's built-in username/password filter

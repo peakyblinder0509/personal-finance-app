@@ -1,0 +1,28 @@
+# Works like .gitignore, but for "docker build". Anything listed here is NOT
+# sent to the Docker engine, so the build is faster and we never accidentally
+# bake secrets or local cruft into the image.
+
+# Build output — Stage 1 rebuilds this inside the image anyway.
+build/
+bin/
+out/
+.gradle/
+
+# Secrets — your real .env must NEVER end up in an image layer.
+.env
+.env.*
+!.env.example
+
+# Version control & IDE noise.
+.git/
+.idea/
+.vscode/
+.metals/
+*.iml
+
+# Logs.
+logs/
+*.log
+
+# OS files.
+.DS_Store

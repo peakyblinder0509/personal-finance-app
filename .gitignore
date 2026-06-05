@@ -24,6 +24,8 @@ logs/
 # ── Secrets — NEVER commit these ─────────────────────────────────────────────
 .env
 .env.*
+# …but DO commit the template (it contains no real secrets):
+!.env.example
 application-local.properties
 application-secret.properties
 

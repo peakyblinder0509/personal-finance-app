@@ -1,0 +1,57 @@
+# docker-compose describes a MULTI-container setup and the network between them.
+# One command — `docker compose up` — builds and starts everything together.
+
+services:
+  # ── PostgreSQL database ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine          # official Postgres 16 on tiny Alpine Linux
+    environment:
+      # The postgres image reads these on FIRST startup to create the database
+      # and the superuser. Values come from your .env file (see .env.example).
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Persist the database files in a NAMED VOLUME. Without this, all data is
+      # lost the moment the container is removed. The volume outlives containers.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Docker runs this command INSIDE the container on a schedule to decide
+      # whether postgres is truly "healthy" (accepting connections), not just
+      # "started". pg_isready ships with the postgres image.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s     # check every 5 seconds
+      timeout: 5s      # a check that takes >5s counts as a failure
+      retries: 5       # 5 failures in a row → mark the container "unhealthy"
+      start_period: 10s # grace window on boot before failures start counting
+
+  # ── Spring Boot application ─────────────────────────────────────────────────
+  app:
+    build: .                            # build the image from the Dockerfile here
+    depends_on:
+      postgres:
+        # KEY LINE: don't start the app until postgres reports "healthy" above.
+        # Plain "depends_on: [postgres]" would only wait for the container to
+        # start, not for the database to actually be ready to accept queries —
+        # the app would crash on boot trying to connect too early.
+        condition: service_healthy
+    environment:
+      # Activate the production profile → loads application-prod.properties.
+      SPRING_PROFILES_ACTIVE: prod
+      # Build the JDBC URL from the same .env values. Note the host is "postgres"
+      # — the SERVICE NAME above — NOT localhost. Inside Docker's private network,
+      # each service is reachable by its name. "localhost" would mean the app's
+      # own container, where no database is running.
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    ports:
+      # "host:container" — publish the container's 8080 to your machine's 8080,
+      # so you can reach the API at http://localhost:8080 from outside Docker.
+      - "8080:8080"
+
+# Declare the named volume so Docker manages its lifecycle.
+volumes:
+  postgres_data:
