@@ -26,33 +26,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    # "services" are extra containers GitHub starts alongside your job, on the
-    # same network. We start PostgreSQL here as requested.
-    #
-    # NOTE: the current test suite uses an in-memory H2 database (see
-    # src/test/resources/application.properties), so it does NOT actually need
-    # this container. We deliberately do NOT point the tests at it — Spring lets
-    # environment variables override application.properties, so injecting a
-    # Postgres URL here would override the H2 config and break the tests.
-    # The service is kept as scaffolding for future integration tests that run
-    # against a real Postgres. Remove it if you never add those.
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: finance_tracker
-          POSTGRES_USER: postgres
-          # The password comes from a GitHub Secret, never hardcoded.
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        ports:
-          - 5432:5432   # expose the DB to the runner on localhost:5432
-        # GitHub waits until this health check passes before starting our steps,
-        # so the DB is guaranteed ready (not just "started").
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
+    # NOTE: the test suite runs entirely on an in-memory H2 database (see
+    # src/test/resources/application.properties), so this job needs no external
+    # services. A PostgreSQL service container was removed because the tests
+    # never connected to it, yet the job still failed when its POSTGRES_PASSWORD
+    # secret was missing/empty — gating the test suite on a DB it doesn't use.
+    # If real Postgres-backed integration tests are added later, reintroduce a
+    # postgres service here and point those tests at it explicitly.
 
     steps:
       # Pull the repository's code onto the runner.
