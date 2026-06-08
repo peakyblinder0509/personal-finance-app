@@ -1,5 +1,6 @@
 package com.financetracker.controller;
 
+import com.financetracker.dto.AlertCountResponse;
 import com.financetracker.dto.AlertResponse;
 import com.financetracker.entity.AlertType;
 import com.financetracker.entity.Budget;
@@ -35,6 +36,15 @@ public class AlertController {
                 : budgetAlertService.getUnreadAlerts(userId);
 
         return ResponseEntity.ok(alerts.stream().map(this::toResponse).toList());
+    }
+
+    // GET /api/alerts/count → number of unread alerts, for the UI badge.
+    // A dedicated count endpoint is far cheaper than fetching the full list
+    // just to call .length on the client.
+    @GetMapping("/count")
+    public ResponseEntity<AlertCountResponse> getUnreadCount(Principal principal) {
+        long count = budgetAlertService.getUnreadCount(userId(principal));
+        return ResponseEntity.ok(new AlertCountResponse(count));
     }
 
     // PUT not POST — we are updating the state of an existing resource, not creating one

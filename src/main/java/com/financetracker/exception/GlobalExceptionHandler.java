@@ -7,8 +7,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -39,6 +41,28 @@ public class GlobalExceptionHandler {
         log.warn("Validation failed — {}", details);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.of(400, "Validation failed: " + details));
+    }
+
+    // A required @RequestParam was not supplied (e.g. GET /api/budgets/status with
+    // no ?category=). That's a client mistake, so 400 — not a 500.
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException ex) {
+        log.warn("Missing request parameter: {}", ex.getParameterName());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(400, "Missing required parameter: " + ex.getParameterName()));
+    }
+
+    // A param was supplied but couldn't be converted to the expected type
+    // (e.g. month=June where an int is required). Also a client mistake → 400.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String requiredType = ex.getRequiredType() != null
+                ? ex.getRequiredType().getSimpleName() : "the expected type";
+        log.warn("Type mismatch for parameter '{}': '{}' is not a valid {}",
+                ex.getName(), ex.getValue(), requiredType);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of(400, "Parameter '" + ex.getName()
+                        + "' must be a valid " + requiredType));
     }
 
     @ExceptionHandler(IllegalStateException.class)

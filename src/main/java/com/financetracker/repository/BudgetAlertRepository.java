@@ -12,6 +12,11 @@ public interface BudgetAlertRepository extends JpaRepository<BudgetAlert, UUID> 
     // Returns unread alerts for a user, newest first — used by GET /api/alerts
     List<BudgetAlert> findByUser_IdAndIsReadFalseOrderByCreatedAtDesc(UUID userId);
 
+    // Counts unread alerts for a user — used by GET /api/alerts/count.
+    // Spring Data turns "countBy..." into SELECT COUNT(*), so we never load the
+    // rows themselves; the database does the counting and returns a single number.
+    long countByUser_IdAndIsReadFalse(UUID userId);
+
     // Returns all alerts of one type for a user, newest first
     // — used by GET /api/alerts?type=ANOMALY
     List<BudgetAlert> findByUser_IdAndAlertTypeOrderByCreatedAtDesc(UUID userId, AlertType alertType);

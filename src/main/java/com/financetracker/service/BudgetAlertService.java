@@ -85,6 +85,12 @@ public class BudgetAlertService {
         return alerts;
     }
 
+    public long getUnreadCount(UUID userId) {
+        long count = alertRepository.countByUser_IdAndIsReadFalse(userId);
+        log.debug("User userId={} has {} unread alert(s)", userId, count);
+        return count;
+    }
+
     public List<BudgetAlert> getAlertsByType(UUID userId, AlertType type) {
         List<BudgetAlert> alerts = alertRepository
                 .findByUser_IdAndAlertTypeOrderByCreatedAtDesc(userId, type);
