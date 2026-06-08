@@ -125,17 +125,18 @@ public class AiService {
 
     public String budgetAdvice(UUID userId) {
         LocalDate today = LocalDate.now();
-        List<Budget> budgets = budgetService.getByMonth(userId, today.getMonthValue(), today.getYear());
+        List<BudgetWithSpent> budgets = budgetService.getByMonth(userId, today.getMonthValue(), today.getYear());
 
         if (budgets.isEmpty()) {
             return "You have no budgets set for this month. Create a few category budgets to get personalized advice.";
         }
 
         StringBuilder status = new StringBuilder();
-        for (Budget b : budgets) {
+        for (BudgetWithSpent bws : budgets) {
+            Budget b = bws.budget();
             // Only aggregated numbers leave our system — category, limit, spent.
             status.append("- %s: spent $%s of $%s budget%n"
-                    .formatted(b.getCategory(), b.getSpentAmount(), b.getLimitAmount()));
+                    .formatted(b.getCategory(), bws.spentAmount(), b.getLimitAmount()));
         }
 
         String userPrompt = """

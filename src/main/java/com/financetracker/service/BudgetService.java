@@ -4,6 +4,7 @@ import com.financetracker.entity.Budget;
 import com.financetracker.entity.User;
 import com.financetracker.exception.ResourceNotFoundException;
 import com.financetracker.repository.BudgetRepository;
+import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,15 +21,19 @@ public class BudgetService {
     private static final Logger log = LoggerFactory.getLogger(BudgetService.class);
 
     private final BudgetRepository budgetRepository;
+    private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
 
-    public BudgetService(BudgetRepository budgetRepository, UserRepository userRepository) {
+    public BudgetService(BudgetRepository budgetRepository,
+                         TransactionRepository transactionRepository,
+                         UserRepository userRepository) {
         this.budgetRepository = budgetRepository;
+        this.transactionRepository = transactionRepository;
         this.userRepository = userRepository;
     }
 
     @Transactional
-    public Budget create(UUID userId, String category, BigDecimal limitAmount, int month, int year) {
+    public BudgetWithSpent create(UUID userId, String category, BigDecimal limitAmount, int month, int year) {
         log.debug("Creating budget: category='{}', limit={}, month={}/{}, userId={}",
                 category, limitAmount, month, year, userId);
 
@@ -37,19 +42,23 @@ public class BudgetService {
 
         Budget saved = budgetRepository.save(Budget.builder()
                 .user(user).category(category)
-                .limitAmount(limitAmount).spentAmount(BigDecimal.ZERO)
+                .limitAmount(limitAmount)
                 .month(month).year(year)
                 .build());
 
         log.info("Budget created: id={}, category='{}', limit={}, month={}/{}, userId={}",
                 saved.getId(), category, limitAmount, month, year, userId);
-        return saved;
+        // There may already be transactions in this category this month, so compute
+        // spent rather than assuming 0.
+        return new BudgetWithSpent(saved, spentFor(userId, saved));
     }
 
-    public List<Budget> getByMonth(UUID userId, int month, int year) {
+    public List<BudgetWithSpent> getByMonth(UUID userId, int month, int year) {
         List<Budget> budgets = budgetRepository.findByUser_IdAndMonthAndYear(userId, month, year);
         log.debug("Fetched {} budgets for userId={}, month={}/{}", budgets.size(), userId, month, year);
-        return budgets;
+        return budgets.stream()
+                .map(b -> new BudgetWithSpent(b, spentFor(userId, b)))
+                .toList();
     }
 
     public BudgetStatus getBudgetStatus(UUID userId, String category, int month, int year) {
@@ -60,17 +69,26 @@ public class BudgetService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Budget not found: " + category + " " + month + "/" + year));
 
+        BigDecimal spent = spentFor(userId, budget);
+
         BigDecimal percentUsed = BigDecimal.ZERO;
         if (budget.getLimitAmount().compareTo(BigDecimal.ZERO) > 0) {
-            percentUsed = budget.getSpentAmount()
+            percentUsed = spent
                     .divide(budget.getLimitAmount(), 4, RoundingMode.HALF_UP)
                     .multiply(new BigDecimal("100"))
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
         log.debug("Budget status: category='{}', spent={}, limit={}, percent={}%, userId={}",
-                category, budget.getSpentAmount(), budget.getLimitAmount(), percentUsed, userId);
+                category, spent, budget.getLimitAmount(), percentUsed, userId);
 
-        return new BudgetStatus(budget, percentUsed);
+        return new BudgetStatus(budget, spent, percentUsed);
+    }
+
+    // Computes how much has been spent against a budget: the sum of EXPENSE
+    // transactions in the same category, month and year for this user.
+    private BigDecimal spentFor(UUID userId, Budget budget) {
+        return transactionRepository.sumExpensesByUserCategoryAndMonth(
+                userId, budget.getCategory(), budget.getYear(), budget.getMonth());
     }
 }

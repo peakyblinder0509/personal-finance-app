@@ -244,14 +244,14 @@ class AiServiceTest {
                 .build();
     }
 
-    private Budget budget(String category, String limit, String spent) {
-        return Budget.builder()
+    private BudgetWithSpent budget(String category, String limit, String spent) {
+        Budget b = Budget.builder()
                 .id(UUID.randomUUID())
                 .category(category)
                 .limitAmount(new BigDecimal(limit))
-                .spentAmount(new BigDecimal(spent))
                 .month(LocalDate.now().getMonthValue())
                 .year(LocalDate.now().getYear())
                 .build();
+        return new BudgetWithSpent(b, new BigDecimal(spent));
     }
 }

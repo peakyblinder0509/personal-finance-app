@@ -34,8 +34,8 @@ public class Budget {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal limitAmount;            // maps to "limit_amount" via Spring naming strategy
 
-    @Column(nullable = false, precision = 19, scale = 4)
-    private BigDecimal spentAmount;            // maps to "spent_amount"
+    // No spent_amount column: how much has been spent in this category/month is
+    // computed on demand from EXPENSE transactions. See BudgetService.
 
     @Column(nullable = false)
     private int month;                         // 1–12

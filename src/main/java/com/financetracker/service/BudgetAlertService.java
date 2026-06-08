@@ -7,6 +7,7 @@ import com.financetracker.entity.User;
 import com.financetracker.exception.ResourceNotFoundException;
 import com.financetracker.repository.BudgetAlertRepository;
 import com.financetracker.repository.BudgetRepository;
+import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,13 +29,16 @@ public class BudgetAlertService {
 
     private final BudgetAlertRepository alertRepository;
     private final BudgetRepository budgetRepository;
+    private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
 
     public BudgetAlertService(BudgetAlertRepository alertRepository,
                                BudgetRepository budgetRepository,
+                               TransactionRepository transactionRepository,
                                UserRepository userRepository) {
         this.alertRepository = alertRepository;
         this.budgetRepository = budgetRepository;
+        this.transactionRepository = transactionRepository;
         this.userRepository = userRepository;
     }
 
@@ -50,7 +54,12 @@ public class BudgetAlertService {
         for (Budget budget : budgets) {
             if (budget.getLimitAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
 
-            BigDecimal ratio = budget.getSpentAmount()
+            // Spent is computed from this category's EXPENSE transactions for the
+            // month being processed, not read from the budget row.
+            BigDecimal spent = transactionRepository.sumExpensesByUserCategoryAndMonth(
+                    budget.getUser().getId(), budget.getCategory(), year, month);
+
+            BigDecimal ratio = spent
                     .divide(budget.getLimitAmount(), 4, RoundingMode.HALF_UP);
 
             if (ratio.compareTo(EXCEEDED_THRESHOLD) >= 0) {

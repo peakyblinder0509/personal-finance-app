@@ -57,4 +57,20 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             WHERE t.account.user.id = :userId
             """)
     BigDecimal sumNetWorthByUserId(@Param("userId") UUID userId);
+
+    // How much a user has spent in one category in one month — this is a budget's
+    // "spent" figure. Only EXPENSE transactions count; income is ignored.
+    @Query("""
+            SELECT COALESCE(SUM(t.amount), 0)
+            FROM Transaction t
+            WHERE t.account.user.id = :userId
+              AND t.type            = com.financetracker.entity.TransactionType.EXPENSE
+              AND t.category        = :category
+              AND YEAR(t.date)      = :year
+              AND MONTH(t.date)     = :month
+            """)
+    BigDecimal sumExpensesByUserCategoryAndMonth(@Param("userId") UUID userId,
+                                                 @Param("category") String category,
+                                                 @Param("year") int year,
+                                                 @Param("month") int month);
 }

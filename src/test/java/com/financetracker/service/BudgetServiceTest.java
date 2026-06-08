@@ -3,6 +3,7 @@ package com.financetracker.service;
 import com.financetracker.entity.Budget;
 import com.financetracker.entity.User;
 import com.financetracker.repository.BudgetRepository;
+import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,7 +32,12 @@ class BudgetServiceTest {
     @Mock
     private BudgetRepository budgetRepository;
 
-    // UserService also needs a UserRepository in its constructor. getBudgetStatus
+    // Budgets now read their "spent" figure from transactions, so the service
+    // depends on this repository too — we stub it to return a known spent amount.
+    @Mock
+    private TransactionRepository transactionRepository;
+
+    // BudgetService also needs a UserRepository in its constructor. getBudgetStatus
     // never touches it, but the object still has to be constructable, so we mock it too.
     @Mock
     private UserRepository userRepository;
@@ -98,12 +104,14 @@ class BudgetServiceTest {
                 .user(User.builder().id(userId).build())
                 .category("Groceries")
                 .limitAmount(limit)
-                .spentAmount(spent)
                 .month(5)
                 .year(2026)
                 .build();
 
         when(budgetRepository.findByUser_IdAndCategoryAndMonthAndYear(userId, "Groceries", 5, 2026))
                 .thenReturn(Optional.of(budget));
+        // "spent" no longer lives on the budget — it's summed from transactions.
+        when(transactionRepository.sumExpensesByUserCategoryAndMonth(userId, "Groceries", 2026, 5))
+                .thenReturn(spent);
     }
 }

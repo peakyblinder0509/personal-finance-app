@@ -6,10 +6,12 @@ import com.financetracker.dto.BudgetStatusResponse;
 import com.financetracker.entity.Budget;
 import com.financetracker.service.BudgetService;
 import com.financetracker.service.BudgetStatus;
+import com.financetracker.service.BudgetWithSpent;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
@@ -44,7 +46,7 @@ public class BudgetController {
     @PostMapping
     public ResponseEntity<BudgetResponse> create(@Valid @RequestBody BudgetRequest request,
                                                   Principal principal) {
-        Budget budget = budgetService.create(
+        BudgetWithSpent budget = budgetService.create(
                 userId(principal), request.category(),
                 request.limitAmount(), request.month(), request.year());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(budget));
@@ -59,7 +61,8 @@ public class BudgetController {
             Principal principal) {
 
         BudgetStatus status = budgetService.getBudgetStatus(userId(principal), category, month, year);
-        return ResponseEntity.ok(new BudgetStatusResponse(toResponse(status.budget()), status.percentUsed()));
+        BudgetResponse budget = toResponse(status.budget(), status.spentAmount());
+        return ResponseEntity.ok(new BudgetStatusResponse(budget, status.percentUsed()));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -68,9 +71,13 @@ public class BudgetController {
         return UUID.fromString(principal.getName());
     }
 
-    private BudgetResponse toResponse(Budget b) {
+    private BudgetResponse toResponse(BudgetWithSpent bws) {
+        return toResponse(bws.budget(), bws.spentAmount());
+    }
+
+    private BudgetResponse toResponse(Budget b, BigDecimal spent) {
         return new BudgetResponse(
                 b.getId(), b.getCategory(), b.getLimitAmount(),
-                b.getSpentAmount(), b.getMonth(), b.getYear());
+                spent, b.getMonth(), b.getYear());
     }
 }
