@@ -50,7 +50,7 @@ services:
     ports:
       # "host:container" — publish the container's 8080 to your machine's 8080,
       # so you can reach the API at http://localhost:8080 from outside Docker.
-      - "8080:8080"
+      - "9090:8080"
 
 # Declare the named volume so Docker manages its lifecycle.
 volumes:
