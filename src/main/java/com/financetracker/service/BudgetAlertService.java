@@ -12,10 +12,14 @@ import com.financetracker.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,14 +46,53 @@ public class BudgetAlertService {
         this.userRepository = userRepository;
     }
 
-    // Called by the scheduled job. @Transactional keeps the Hibernate session
-    // open for the entire loop so lazy-loading budget.getUser() works safely.
+    // Called by the scheduled job (all users). @Transactional keeps the Hibernate
+    // session open for the whole loop so lazy-loading budget.getUser() works safely.
     @Transactional
     public void processMonthlyBudgetAlerts(int month, int year) {
         List<Budget> budgets = budgetRepository.findByMonthAndYear(month, year);
-        log.debug("Checking {} budget(s) for alerts — {}/{}", budgets.size(), month, year);
+        int created = processBudgets(budgets, month, year);
+        log.info("Budget alert job: {} alert(s) created for {}/{}", created, month, year);
+    }
 
-        int warnings = 0, exceeded = 0;
+    // Same check, scoped to ONE user — used by POST /api/alerts/check so a user can
+    // trigger their own budget alerts on demand. Returns how many alerts were created.
+    @Transactional
+    public int checkBudgetAlertsForUser(UUID userId, int month, int year) {
+        List<Budget> budgets = budgetRepository.findByUser_IdAndMonthAndYear(userId, month, year);
+        int created = processBudgets(budgets, month, year);
+        log.info("On-demand budget check: {} alert(s) created for userId={}, {}/{}",
+                created, userId, month, year);
+        return created;
+    }
+
+    /**
+     * Re-check budget alerts automatically whenever a transaction is created, so a
+     * WARNING/EXCEEDED alert appears as soon as the spending crosses a threshold —
+     * no waiting for the daily job. We use the SAME pattern as anomaly detection:
+     * run AFTER the transaction's DB commit ({@code AFTER_COMMIT}) so this check can
+     * never roll back or block transaction creation.
+     *
+     * We check the month/year of the transaction's date (not "today"), so back-dated
+     * transactions are credited to the correct month's budget.
+     */
+    // REQUIRES_NEW: the original transaction has already committed by AFTER_COMMIT,
+    // so the alert writes need their own fresh transaction. Annotating the listener
+    // (which Spring invokes through the proxy) is what makes @Transactional apply —
+    // an internal call to checkBudgetAlertsForUser would bypass the proxy.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onTransactionCreated(TransactionCreatedEvent event) {
+        LocalDate date = event.transaction().getDate();
+        checkBudgetAlertsForUser(event.userId(), date.getMonthValue(), date.getYear());
+    }
+
+    // Shared loop: for each budget, compute spend and create a WARNING/EXCEEDED
+    // alert if a threshold is crossed and no matching unread alert already exists.
+    // Returns the total number of alerts created.
+    private int processBudgets(List<Budget> budgets, int month, int year) {
+        log.debug("Checking {} budget(s) for alerts — {}/{}", budgets.size(), month, year);
+        int created = 0;
 
         for (Budget budget : budgets) {
             if (budget.getLimitAmount().compareTo(BigDecimal.ZERO) <= 0) continue;
@@ -69,7 +112,7 @@ public class BudgetAlertService {
                             "Budget for '%s' has been exceeded (%.0f%% used)",
                             budget.getCategory(),
                             ratio.multiply(BigDecimal.valueOf(100))));
-                    exceeded++;
+                    created++;
                 }
             } else if (ratio.compareTo(WARNING_THRESHOLD) >= 0) {
                 if (!alertRepository.existsByBudget_IdAndAlertTypeAndIsReadFalse(
@@ -78,13 +121,11 @@ public class BudgetAlertService {
                             "Budget for '%s' is at %.0f%% of its limit",
                             budget.getCategory(),
                             ratio.multiply(BigDecimal.valueOf(100))));
-                    warnings++;
+                    created++;
                 }
             }
         }
-
-        log.info("Budget alert job: {} warning(s) and {} exceeded alert(s) created for {}/{}",
-                warnings, exceeded, month, year);
+        return created;
     }
 
     public List<BudgetAlert> getUnreadAlerts(UUID userId) {

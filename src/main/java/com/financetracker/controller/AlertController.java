@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -53,6 +54,17 @@ public class AlertController {
     public ResponseEntity<AlertCountResponse> getUnreadCount(Principal principal) {
         long count = budgetAlertService.getUnreadCount(userId(principal));
         return ResponseEntity.ok(new AlertCountResponse(count));
+    }
+
+    // POST /api/alerts/check → runs the budget check for the logged-in user right
+    // now (instead of waiting for the daily job) and creates any WARNING/EXCEEDED
+    // alerts that are due. Returns { "count": N } = how many alerts were created.
+    @PostMapping("/check")
+    public ResponseEntity<AlertCountResponse> checkNow(Principal principal) {
+        LocalDate today = LocalDate.now();
+        int created = budgetAlertService.checkBudgetAlertsForUser(
+                userId(principal), today.getMonthValue(), today.getYear());
+        return ResponseEntity.ok(new AlertCountResponse(created));
     }
 
     // PUT /api/alerts/read-all → marks all of the user's unread alerts as read.
