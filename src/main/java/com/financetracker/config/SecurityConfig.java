@@ -38,7 +38,17 @@ public class SecurityConfig {
 
         return http.build();
     }
-
+    @Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(List.of("*")); // or your frontend URL
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
+    return source;
+}
     // Kept here alongside the security config — PasswordEncoder is a security concern,
     // not a general application concern, so AppConfig no longer needs to exist.
     @Bean
