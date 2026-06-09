@@ -42,7 +42,7 @@ services:
       # — the SERVICE NAME above — NOT localhost. Inside Docker's private network,
       # each service is reachable by its name. "localhost" would mean the app's
       # own container, where no database is running.
-      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      DB_URL: jdbc:postgresql://postgres:5433/${POSTGRES_DB}
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
